@@ -1,0 +1,123 @@
+name: Extract OpenClaw Schema
+
+on:
+  schedule:
+    # 每天 UTC 02:00（北京时间 10:00）
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "openclaw/openclaw git ref (branch/tag)"
+        required: false
+        default: "main"
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout openclaw-schema repo
+        uses: actions/checkout@v4
+        with:
+          path: openclaw-schema
+
+      - name: Checkout openclaw/openclaw source
+        uses: actions/checkout@v4
+        with:
+          repository: openclaw/openclaw
+          ref: ${{ github.event.inputs.ref || 'main' }}
+          path: openclaw-src
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install zod (only what we need)
+        # 只安装 zod，不需要全量 npm ci（openclaw 有私有依赖会失败）
+        # 从 package.json 读取 zod 版本，精确安装
+        working-directory: openclaw-src
+        run: |
+          ZOD_VERSION=$(node -e "const p=require('./package.json'); console.log((p.dependencies||{}).zod||(p.devDependencies||{}).zod||'latest')")
+          echo "Installing zod@${ZOD_VERSION}"
+          npm install --no-save "zod@${ZOD_VERSION}" 2>&1 | tail -3
+
+      - name: Install tsx globally
+        run: npm install -g tsx
+
+      - name: Get OpenClaw version
+        id: version
+        working-directory: openclaw-src
+        run: |
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "OpenClaw version: $VERSION"
+
+      - name: Extract schema
+        # cwd = openclaw-src，node_modules/zod 在此目录下，tsx ESM 能 resolve
+        working-directory: openclaw-src
+        run: |
+          node ../openclaw-schema/scripts/extract-schema-ci.mjs \
+            --mode local \
+            --src-dir ./src \
+            --zod-dir ./node_modules \
+            --ref "${{ steps.version.outputs.version }}" \
+            --output "${{ github.workspace }}/openclaw-schema/openclaw.schema.json"
+
+      - name: Archive versioned schema to history/
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p openclaw-schema/history
+          cp openclaw-schema/openclaw.schema.json "openclaw-schema/history/openclaw.${VERSION}.schema.json"
+          echo "✅ Archived: history/openclaw.${VERSION}.schema.json"
+
+      - name: Check for changes
+        id: diff
+        working-directory: openclaw-schema
+        run: |
+          git add -N history/  # detect new files in history/
+          git diff --quiet openclaw.schema.json history/ && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: openclaw-schema
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add openclaw.schema.json "history/openclaw.${VERSION}.schema.json"
+          git commit -m "chore: update schema for OpenClaw v${VERSION} [$(date -u '+%Y-%m-%d')]"
+          git push
+
+      - name: Create GitHub Release
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: openclaw-schema
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v${VERSION}"
+          # Delete existing tag/release if re-running for same version
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git tag -f "$TAG"
+          git push origin "$TAG" --force
+          gh release create "$TAG" \
+            --title "OpenClaw Schema v${VERSION}" \
+            --notes "JSON Schema for OpenClaw v${VERSION} configuration file.
+
+          Generated on $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          ## Usage
+
+          Add to your \`openclaw.json\`:
+          \`\`\`json
+          { \"\\\$schema\": \"https://github.com/${{ github.repository }}/releases/download/${TAG}/openclaw.schema.json\" }
+          \`\`\`" \
+            openclaw.schema.json
+
+      - name: No changes
+        if: steps.diff.outputs.changed == 'false'
+        run: echo "Schema unchanged, nothing to commit."
