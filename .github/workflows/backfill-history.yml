@@ -2,7 +2,11 @@ name: Backfill History Schemas
 
 on:
   workflow_dispatch:
-    # 手动触发，遍历 openclaw/openclaw 所有历史 tag，提取缺失的 schema
+    inputs:
+      after:
+        description: "只处理此版本之后的 tag（如 2026.2.14），留空则处理全部"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -43,28 +47,56 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Backfill all historical tags
+      - name: Backfill historical tags
         working-directory: openclaw-src
         env:
           GH_TOKEN: ${{ github.token }}
           SCHEMA_DIR: ${{ github.workspace }}/openclaw-schema
-          SRC_DIR: ${{ github.workspace }}/openclaw-src
         run: |
           set -o pipefail
 
           HISTORY_DIR="${SCHEMA_DIR}/history"
           mkdir -p "$HISTORY_DIR"
 
-          # 收集所有 v* tag，按版本号排序
-          TAGS=$(git tag -l "v*" | sort -V)
-          if [ -z "$TAGS" ]; then
+          # 列出所有正式 tag，跳过 beta/alpha/rc 等预发布版本
+          ALL_TAGS=$(git tag -l "v*" | grep -v -E '(alpha|beta|rc|pre|dev|canary)' | sort -V)
+
+          if [ -z "$ALL_TAGS" ]; then
+            echo "No tags found."
+            exit 0
+          fi
+
+          # --after 过滤
+          AFTER="${{ github.event.inputs.after }}"
+          if [ -n "$AFTER" ]; then
+            AFTER_TAG="v${AFTER#v}"
+            echo "Filtering tags after ${AFTER_TAG}..."
+            FOUND=false
+            FILTERED=""
+            while IFS= read -r TAG; do
+              if $FOUND; then
+                FILTERED="${FILTERED}${TAG}"$'\n'
+              fi
+              if [ "$TAG" = "$AFTER_TAG" ]; then
+                FOUND=true
+              fi
+            done <<< "$ALL_TAGS"
+
+            if ! $FOUND; then
+              echo "WARN: tag ${AFTER_TAG} not found, processing all tags"
+            else
+              ALL_TAGS=$(echo "$FILTERED" | sed '/^$/d')
+            fi
+          fi
+
+          if [ -z "$ALL_TAGS" ]; then
             TOTAL=0
           else
-            TOTAL=$(echo "$TAGS" | wc -l | tr -d ' ')
+            TOTAL=$(echo "$ALL_TAGS" | wc -l | tr -d ' ')
           fi
 
           echo "========================================"
-          echo "Found $TOTAL tags to process"
+          echo "Tags to process: $TOTAL"
           echo "========================================"
 
           SUCCEEDED=0
@@ -73,8 +105,8 @@ jobs:
           FAILED_LIST=""
           SUCCEEDED_VERSIONS=""
 
-          for TAG in $TAGS; do
-            VERSION="${TAG#v}"  # 去掉 v 前缀
+          for TAG in $ALL_TAGS; do
+            VERSION="${TAG#v}"
             HISTORY_FILE="${HISTORY_DIR}/openclaw.${VERSION}.schema.json"
 
             echo ""
@@ -107,7 +139,7 @@ jobs:
               continue
             fi
 
-            # 提取 schema
+            # 使用 --mode local 从本地源码提取
             if node "${SCHEMA_DIR}/scripts/extract-schema-ci.mjs" \
               --mode local \
               --src-dir ./src \
@@ -139,7 +171,7 @@ jobs:
             fi
           done
 
-          # 恢复 openclaw-src 到 main（清理 detached HEAD）
+          # 恢复 openclaw-src 到 main
           git checkout main --quiet 2>/dev/null || true
 
           echo ""
@@ -157,7 +189,6 @@ jobs:
             echo -e "$FAILED_LIST"
           fi
 
-          # 保存成功版本列表供后续步骤使用
           echo "succeeded_versions=${SUCCEEDED_VERSIONS}" >> "$GITHUB_ENV"
           echo "succeeded_count=${SUCCEEDED}" >> "$GITHUB_ENV"
 
@@ -177,7 +208,6 @@ jobs:
             TAG="v${VERSION}"
             echo "Creating release for ${TAG}..."
 
-            # 删除已有的同名 release/tag（幂等）
             gh release delete "$TAG" --yes 2>/dev/null || true
             git tag -f "$TAG" || { echo "  WARN: failed to tag ${TAG}"; continue; }
             git push origin "$TAG" --force || { echo "  WARN: failed to push tag ${TAG}"; continue; }
