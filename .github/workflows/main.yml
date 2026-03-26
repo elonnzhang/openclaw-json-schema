@@ -1,0 +1,201 @@
+name: Backfill History Schemas
+
+on:
+  workflow_dispatch:
+    # 手动触发，遍历 openclaw/openclaw 所有历史 tag，提取缺失的 schema
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backfill-history
+  cancel-in-progress: true
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout openclaw-json-schema repo
+        uses: actions/checkout@v4
+        with:
+          path: openclaw-schema
+
+      - name: Checkout openclaw/openclaw source (all tags)
+        uses: actions/checkout@v4
+        with:
+          repository: openclaw/openclaw
+          fetch-depth: 0
+          path: openclaw-src
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install tsx globally
+        run: npm install -g tsx
+
+      - name: Configure git
+        working-directory: openclaw-schema
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Backfill all historical tags
+        working-directory: openclaw-src
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCHEMA_DIR: ${{ github.workspace }}/openclaw-schema
+          SRC_DIR: ${{ github.workspace }}/openclaw-src
+        run: |
+          set -o pipefail
+
+          HISTORY_DIR="${SCHEMA_DIR}/history"
+          mkdir -p "$HISTORY_DIR"
+
+          # 收集所有 v* tag，按版本号排序
+          TAGS=$(git tag -l "v*" | sort -V)
+          if [ -z "$TAGS" ]; then
+            TOTAL=0
+          else
+            TOTAL=$(echo "$TAGS" | wc -l | tr -d ' ')
+          fi
+
+          echo "========================================"
+          echo "Found $TOTAL tags to process"
+          echo "========================================"
+
+          SUCCEEDED=0
+          FAILED=0
+          SKIPPED=0
+          FAILED_LIST=""
+          SUCCEEDED_VERSIONS=""
+
+          for TAG in $TAGS; do
+            VERSION="${TAG#v}"  # 去掉 v 前缀
+            HISTORY_FILE="${HISTORY_DIR}/openclaw.${VERSION}.schema.json"
+
+            echo ""
+            echo "----------------------------------------"
+            echo "Processing: $TAG (version $VERSION)"
+            echo "----------------------------------------"
+
+            # 跳过已存在的
+            if [ -f "$HISTORY_FILE" ]; then
+              echo "  Already exists, skipping"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # Checkout 到对应 tag
+            if ! git checkout "$TAG" --quiet 2>/dev/null; then
+              echo "  FAIL: checkout $TAG"
+              FAILED=$((FAILED + 1))
+              FAILED_LIST="${FAILED_LIST}  - ${TAG} (checkout failed)\n"
+              continue
+            fi
+
+            # 读取 zod 版本并安装
+            ZOD_VERSION=$(node -e "try{const p=require('./package.json');console.log((p.dependencies||{}).zod||(p.devDependencies||{}).zod||'latest')}catch{console.log('latest')}" 2>/dev/null)
+            echo "  Installing zod@${ZOD_VERSION}"
+            if ! npm install --no-save "zod@${ZOD_VERSION}" 2>&1 | tail -2; then
+              echo "  FAIL: zod install"
+              FAILED=$((FAILED + 1))
+              FAILED_LIST="${FAILED_LIST}  - ${TAG} (zod install failed)\n"
+              continue
+            fi
+
+            # 提取 schema
+            if node "${SCHEMA_DIR}/scripts/extract-schema-ci.mjs" \
+              --mode local \
+              --src-dir ./src \
+              --zod-dir ./node_modules \
+              --ref "$VERSION" \
+              --output "$HISTORY_FILE" 2>&1; then
+
+              echo "  OK: extracted"
+
+              # commit 在子 shell 中执行，避免 cd 影响主循环
+              if (
+                cd "$SCHEMA_DIR" &&
+                git add "history/openclaw.${VERSION}.schema.json" &&
+                git diff --cached --quiet && echo "  No changes to commit" && exit 1
+                git commit -m "chore: backfill schema for OpenClaw v${VERSION}" --quiet
+              ); then
+                SUCCEEDED=$((SUCCEEDED + 1))
+                SUCCEEDED_VERSIONS="${SUCCEEDED_VERSIONS} ${VERSION}"
+              else
+                echo "  WARN: commit failed for ${VERSION}"
+                FAILED=$((FAILED + 1))
+                FAILED_LIST="${FAILED_LIST}  - ${TAG} (commit failed)\n"
+              fi
+            else
+              echo "  FAIL: extraction"
+              FAILED=$((FAILED + 1))
+              FAILED_LIST="${FAILED_LIST}  - ${TAG} (extraction failed)\n"
+              rm -f "$HISTORY_FILE"
+            fi
+          done
+
+          # 恢复 openclaw-src 到 main（清理 detached HEAD）
+          git checkout main --quiet 2>/dev/null || true
+
+          echo ""
+          echo "========================================"
+          echo "Backfill Summary"
+          echo "========================================"
+          echo "Total tags:  $TOTAL"
+          echo "Skipped:     $SKIPPED (already existed)"
+          echo "Succeeded:   $SUCCEEDED"
+          echo "Failed:      $FAILED"
+
+          if [ -n "$FAILED_LIST" ]; then
+            echo ""
+            echo "Failed tags:"
+            echo -e "$FAILED_LIST"
+          fi
+
+          # 保存成功版本列表供后续步骤使用
+          echo "succeeded_versions=${SUCCEEDED_VERSIONS}" >> "$GITHUB_ENV"
+          echo "succeeded_count=${SUCCEEDED}" >> "$GITHUB_ENV"
+
+      - name: Push all commits
+        if: env.succeeded_count != '0'
+        working-directory: openclaw-schema
+        run: git push
+
+      - name: Create GitHub Releases
+        if: env.succeeded_count != '0'
+        working-directory: openclaw-schema
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSIONS: ${{ env.succeeded_versions }}
+        run: |
+          for VERSION in $VERSIONS; do
+            TAG="v${VERSION}"
+            echo "Creating release for ${TAG}..."
+
+            # 删除已有的同名 release/tag（幂等）
+            gh release delete "$TAG" --yes 2>/dev/null || true
+            git tag -f "$TAG" || { echo "  WARN: failed to tag ${TAG}"; continue; }
+            git push origin "$TAG" --force || { echo "  WARN: failed to push tag ${TAG}"; continue; }
+
+            gh release create "$TAG" \
+              --title "v${VERSION}" \
+              --notes "JSON Schema for OpenClaw v${VERSION} configuration file.
+
+          Generated by backfill workflow on $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          ## Usage
+
+          Add to your \`openclaw.json\`:
+          \`\`\`json
+          { \"\\\$schema\": \"https://github.com/${{ github.repository }}/releases/download/${TAG}/openclaw.schema.json\" }
+          \`\`\`" \
+              "history/openclaw.${VERSION}.schema.json#openclaw.schema.json" \
+            || echo "  WARN: failed to create release for ${TAG}"
+          done
+
+          echo "Done creating releases"
