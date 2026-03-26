@@ -1,5 +1,5 @@
 ---
-name: extract-schema
+name: extract-openclaw-schema
 description: Extracts OpenClaw's JSON Schema from Zod source via toJSONSchema(). Supports GitHub download, local clone, and offline .d.ts modes. Daily CI auto-update.
 version: 1.0.0
 metadata: {}
@@ -30,13 +30,13 @@ Zod source (.ts) → strip runtime calls → stub transitive deps → tsx → to
 
 ## Scripts
 
-| Script | Mode | Requirements |
-| ------ | ---- | ------------ |
-| `scripts/extract-schema-ci.mjs` | `--mode gh` or `--mode local` | tsx; gh CLI (gh mode); OpenClaw install (gh mode) |
-| `scripts/extract-schema.mjs` | GitHub download only | tsx, gh CLI, OpenClaw install |
-| `scripts/extract-schema-d.ts.mjs` | Offline (.d.ts + TS Compiler API) | tsx, TypeScript, OpenClaw install |
-| `scripts/lib.mjs` | Shared utilities | — |
-| `scripts/test.mjs` | Unit + integration tests | Node.js 20+ |
+| Script                            | Mode                              | Requirements                                      |
+| --------------------------------- | --------------------------------- | ------------------------------------------------- |
+| `scripts/extract-schema-ci.mjs`   | `--mode gh` or `--mode local`     | tsx; gh CLI (gh mode); OpenClaw install (gh mode) |
+| `scripts/extract-schema.mjs`      | GitHub download only              | tsx, gh CLI, OpenClaw install                     |
+| `scripts/extract-schema-d.ts.mjs` | Offline (.d.ts + TS Compiler API) | tsx, TypeScript, OpenClaw install                 |
+| `scripts/lib.mjs`                 | Shared utilities                  | —                                                 |
+| `scripts/test.mjs`                | Unit + integration tests          | Node.js 20+                                       |
 
 ### extract-schema-ci.mjs (recommended)
 
@@ -117,10 +117,12 @@ Runs on push/PR when `scripts/**` changes. Unit tests only (no extraction).
 
 ```json
 {
-  "json.schemas": [{
-    "fileMatch": ["**/openclaw.json"],
-    "url": "https://raw.githubusercontent.com/YOUR_USERNAME/openclaw-schema/main/openclaw.schema.json"
-  }]
+  "json.schemas": [
+    {
+      "fileMatch": ["**/openclaw.json"],
+      "url": "https://raw.githubusercontent.com/YOUR_USERNAME/openclaw-schema/main/openclaw.schema.json"
+    }
+  ]
 }
 ```
 
@@ -128,12 +130,12 @@ Provides: enum dropdowns, type validation, required/optional hints, nested autoc
 
 ## Troubleshooting
 
-| Symptom | Fix |
-| ------- | --- |
-| `Cannot find module '../foo/bar.js'` | Add to `UTIL_FILES` (need types) or `TRANSITIVE_STUBS` (runtime-only) |
-| `gh` auth error | `gh auth login` |
-| `tsx` not found | `npm install -g tsx` |
-| Schema outdated after OpenClaw upgrade | Re-run extraction; use `--keep-tmp` if it fails |
+| Symptom                                | Fix                                                                   |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| `Cannot find module '../foo/bar.js'`   | Add to `UTIL_FILES` (need types) or `TRANSITIVE_STUBS` (runtime-only) |
+| `gh` auth error                        | `gh auth login`                                                       |
+| `tsx` not found                        | `npm install -g tsx`                                                  |
+| Schema outdated after OpenClaw upgrade | Re-run extraction; use `--keep-tmp` if it fails                       |
 
 ### Adding new missing modules
 

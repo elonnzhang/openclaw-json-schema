@@ -1,4 +1,4 @@
-# openclaw-schema
+# openclaw-json-schema
 
 [English](README.md)
 

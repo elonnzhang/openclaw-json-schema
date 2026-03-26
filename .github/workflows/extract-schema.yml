@@ -105,7 +105,7 @@ jobs:
           git tag -f "$TAG"
           git push origin "$TAG" --force
           gh release create "$TAG" \
-            --title "OpenClaw Schema v${VERSION}" \
+            --title "v${VERSION}" \
             --notes "JSON Schema for OpenClaw v${VERSION} configuration file.
 
           Generated on $(date -u '+%Y-%m-%d %H:%M UTC').
