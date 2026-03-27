@@ -1,6 +1,6 @@
 ---
 name: extract-openclaw-schema
-description: Extracts OpenClaw's JSON Schema from Zod source via toJSONSchema(). Supports GitHub download, local clone, and offline .d.ts modes. Daily CI auto-update.
+description: Extracts OpenClaw's JSON Schema from Zod source via toJSONSchema(). Supports GitHub download, local clone, and offline .d.ts modes. Prefer local clone
 version: 1.0.0
 metadata: {}
 ---
@@ -110,7 +110,7 @@ Runs on push/PR when `scripts/**` changes. Unit tests only (no extraction).
 **Option 1** — `$schema` in `openclaw.json`:
 
 ```json
-{ "$schema": "https://raw.githubusercontent.com/YOUR_USERNAME/openclaw-schema/main/openclaw.schema.json" }
+{ "$schema": "https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/openclaw.schema.json" }
 ```
 
 **Option 2** — VS Code `settings.json`:
@@ -120,7 +120,7 @@ Runs on push/PR when `scripts/**` changes. Unit tests only (no extraction).
   "json.schemas": [
     {
       "fileMatch": ["**/openclaw.json"],
-      "url": "https://raw.githubusercontent.com/YOUR_USERNAME/openclaw-schema/main/openclaw.schema.json"
+      "url": "https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/openclaw.schema.json"
     }
   ]
 }

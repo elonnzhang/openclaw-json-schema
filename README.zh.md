@@ -25,13 +25,30 @@ gh release download --pattern 'openclaw.schema.json'
 gh release download v2026.3.24 --pattern 'openclaw.schema.json'
 ```
 
+### 一键写入（推荐）
+
+无需 clone 仓库，直接远程执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/init-config.sh | bash
+
+# 指定配置文件路径
+curl -fsSL https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/init-config.sh | bash -s -- --config ~/project/openclaw.json
+
+# 指定 schema 版本（不指定则使用最新版）
+curl -fsSL https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/init-config.sh | bash -s -- --v 2026.3.24
+```
+
+- 文件不存在：创建包含 `$schema` 的 `openclaw.json`
+- 文件已存在：将 `$schema` 写入首行，保留原有配置
+
 ### VS Code 自动补全
 
 在 `openclaw.json` 中添加 `$schema` 字段：
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/YOUR_USERNAME/openclaw-schema/main/openclaw.schema.json",
+  "$schema": "https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/openclaw.schema.json",
   "gateway": {
     ...
   }
@@ -42,7 +59,7 @@ gh release download v2026.3.24 --pattern 'openclaw.schema.json'
 
 ```json
 {
-  "$schema": "https://github.com/elonnzhang/openclaw-schema/releases/download/v2026.3.24/openclaw.schema.json"
+  "$schema": "https://github.com/elonnzhang/openclaw-json-schema/releases/download/v2026.3.24/openclaw.schema.json"
 }
 ```
 
@@ -53,7 +70,7 @@ gh release download v2026.3.24 --pattern 'openclaw.schema.json'
   "json.schemas": [
     {
       "fileMatch": ["**/openclaw.json"],
-      "url": "https://raw.githubusercontent.com/elonnzhang/openclaw-schema/main/openclaw.schema.json"
+      "url": "https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/openclaw.schema.json"
     }
   ]
 }
@@ -108,6 +125,7 @@ node scripts/extract-schema-d.ts.mjs --output ./openclaw.schema.json
 
 | 脚本                              | 说明                                                                                  |
 | --------------------------------- | ------------------------------------------------------------------------------------- |
+| `init-config.sh`                  | 一键写入 `$schema` 到 `openclaw.json`，支持 `--config` 和 `--v`                       |
 | `scripts/extract-schema-ci.mjs`   | 统一入口，支持 `--mode gh`（GitHub 下载）和 `--mode local`（本地源码），CI 和本地通用 |
 | `scripts/extract-schema.mjs`      | GitHub 源码方式，功能与 CI 脚本的 gh 模式相同，独立使用                               |
 | `scripts/extract-schema-d.ts.mjs` | 本地 `.d.ts` + TS Compiler API 方式，完全离线，无需 gh CLI                            |

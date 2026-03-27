@@ -753,9 +753,6 @@
               },
               "email": {
                 "type": "string"
-              },
-              "displayName": {
-                "type": "string"
               }
             },
             "required": [
@@ -5900,11 +5897,6 @@
                   "maximum": 9007199254740991
                 },
                 "maxCharsCap": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "maxResponseBytes": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -13680,13 +13672,6 @@
                         "autoThread": {
                           "type": "boolean"
                         },
-                        "autoThreadName": {
-                          "type": "string",
-                          "enum": [
-                            "message",
-                            "generated"
-                          ]
-                        },
                         "autoArchiveDuration": {
                           "anyOf": [
                             {
@@ -15192,13 +15177,6 @@
                               },
                               "autoThread": {
                                 "type": "boolean"
-                              },
-                              "autoThreadName": {
-                                "type": "string",
-                                "enum": [
-                                  "message",
-                                  "generated"
-                                ]
                               },
                               "autoArchiveDuration": {
                                 "anyOf": [
@@ -21196,9 +21174,6 @@
             "sendReadReceipts": {
               "type": "boolean"
             },
-            "allowPrivateNetwork": {
-              "type": "boolean"
-            },
             "blockStreaming": {
               "type": "boolean"
             },
@@ -21536,9 +21511,6 @@
                     }
                   },
                   "sendReadReceipts": {
-                    "type": "boolean"
-                  },
-                  "allowPrivateNetwork": {
                     "type": "boolean"
                   },
                   "blockStreaming": {
@@ -22149,29 +22121,6 @@
             },
             "responsePrefix": {
               "type": "string"
-            },
-            "welcomeCard": {
-              "type": "boolean"
-            },
-            "promptStarters": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "groupWelcomeCard": {
-              "type": "boolean"
-            },
-            "feedbackEnabled": {
-              "type": "boolean"
-            },
-            "feedbackReflection": {
-              "type": "boolean"
-            },
-            "feedbackReflectionCooldownMs": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -24078,5 +24027,5 @@
   ],
   "additionalProperties": false,
   "title": "OpenClaw Configuration",
-  "description": "JSON Schema for openclaw.json — OpenClaw v2026.3.24. Generated: 2026-03-26T13:53:10.728Z. VSCode tip: set json.schemas to validate openclaw.json against this file."
+  "description": "JSON Schema for openclaw.json — OpenClaw v2026.3.23. Generated: 2026-03-26T14:33:22.546Z. VSCode tip: set json.schemas to validate openclaw.json against this file."
 }

@@ -25,13 +25,30 @@ gh release download --pattern 'openclaw.schema.json'
 gh release download v2026.3.24 --pattern 'openclaw.schema.json'
 ```
 
+### Quick Init (one-liner)
+
+No need to clone — run remotely:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/init-config.sh | bash
+
+# Specify config file path
+curl -fsSL https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/init-config.sh | bash -s -- --config ~/project/openclaw.json
+
+# Specify schema version (defaults to latest)
+curl -fsSL https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/init-config.sh | bash -s -- --v 2026.3.24
+```
+
+- New file: creates `openclaw.json` with `$schema`
+- Existing file: injects `$schema` as the first field, preserving all other config
+
 ### VS Code Autocompletion
 
 Add a `$schema` field to your `openclaw.json`:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/elonnzhang/openclaw-schema/main/openclaw.schema.json",
+  "$schema": "https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/openclaw.schema.json",
   "gateway": {
     ...
   }
@@ -42,7 +59,7 @@ Or use a pinned Release URL for a specific version:
 
 ```json
 {
-  "$schema": "https://github.com/elonnzhang/openclaw-schema/releases/download/v2026.3.24/openclaw.schema.json"
+  "$schema": "https://github.com/elonnzhang/openclaw-json-schema/releases/download/v2026.3.24/openclaw.schema.json"
 }
 ```
 
@@ -53,7 +70,7 @@ Or configure in VS Code `settings.json`:
   "json.schemas": [
     {
       "fileMatch": ["**/openclaw.json"],
-      "url": "https://raw.githubusercontent.com/YOUR_USERNAME/openclaw-schema/main/openclaw.schema.json"
+      "url": "https://raw.githubusercontent.com/elonnzhang/openclaw-json-schema/main/openclaw.schema.json"
     }
   ]
 }
@@ -108,6 +125,7 @@ node scripts/extract-schema-d.ts.mjs --output ./openclaw.schema.json
 
 | Script                            | Description                                                                                                                    |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `init-config.sh`                  | One-liner to inject `$schema` into `openclaw.json`, supports `--config` and `--v`                                              |
 | `scripts/extract-schema-ci.mjs`   | Unified entry point, supports `--mode gh` (GitHub download) and `--mode local` (local source), works for both CI and local use |
 | `scripts/extract-schema.mjs`      | GitHub source mode, same functionality as the CI script's gh mode, standalone                                                  |
 | `scripts/extract-schema-d.ts.mjs` | Local `.d.ts` + TS Compiler API mode, fully offline, no gh CLI needed                                                          |
