@@ -1062,7 +1062,8 @@
                   "google-generative-ai",
                   "github-copilot",
                   "bedrock-converse-stream",
-                  "ollama"
+                  "ollama",
+                  "azure-openai-responses"
                 ]
               },
               "injectNumCtxForOpenAICompat": {
@@ -1178,7 +1179,8 @@
                         "google-generative-ai",
                         "github-copilot",
                         "bedrock-converse-stream",
-                        "ollama"
+                        "ollama",
+                        "azure-openai-responses"
                       ]
                     },
                     "reasoning": {
@@ -2878,6 +2880,9 @@
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
+                },
+                "requireAgentId": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -4106,6 +4111,9 @@
                   },
                   "thinking": {
                     "type": "string"
+                  },
+                  "requireAgentId": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -12132,5 +12140,5 @@
   ],
   "additionalProperties": false,
   "title": "OpenClaw Configuration",
-  "description": "JSON Schema for openclaw.json — OpenClaw v2026.3.30. Generated: 2026-03-30T04:47:33.544Z. VSCode tip: set json.schemas to validate openclaw.json against this file."
+  "description": "JSON Schema for openclaw.json — OpenClaw v2026.3.30. Generated: 2026-03-31T04:37:55.604Z. VSCode tip: set json.schemas to validate openclaw.json against this file."
 }
